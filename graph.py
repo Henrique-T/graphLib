@@ -3,7 +3,7 @@ import string
 from itertools import count
 import copy
 
-INPUT_FILE = "wiki.net"
+INPUT_FILE = "cor3.net"
 
 class Vertex():
     """
@@ -26,6 +26,8 @@ class Vertex():
         self.visit_end_time = 2147483647        # End of visit counter
         self.k = 2147483647                     # Key value for later to be used in key structure
         self.beenSetInRG = False                # Has the vertex been set in the Residual Graph (RG)?
+        self.belongsToX = False
+        self.belongsToY = False
 
     def getDegree(self) -> int:
         return len(self.getNeighbors())
@@ -205,6 +207,10 @@ class Graph:
         self.edgesOrderedByWeight = list()          # A list with all edges ordered by weight ascending
         self.flow = 2147483647                      # Flow
         self.p = list()                             # List of increasing paths - used for Edmonds-karp
+        self.X = dict()                             # Indexed dict - used for coloring vertices
+        self.availableColors = list()               
+        self.usedColors = list()
+        self.vertexColorMap = dict()
 
     def build(self):
         """
@@ -325,6 +331,18 @@ class Graph:
     def getP(self) -> list:
         return self.p
 
+    def getX(self) -> dict:
+        return self.X
+    
+    def getAvailableColors(self) -> list:
+        return self.availableColors
+    
+    def getUsedColors(self) -> list:
+        return self.usedColors
+    
+    def getVertexColorMap(self) -> dict:
+        return self.vertexColorMap
+
     def setRawEdges(self, raw_edges) -> None:
         self.raw_edges = raw_edges
 
@@ -339,6 +357,13 @@ class Graph:
 
     def setFlow(self, flow) -> None:
         self.flow = flow
+    
+    def setX(self, quantity_vertices) -> None:
+        for i in range(2**(quantity_vertices-1)):
+            self.X[i] = {}
+    
+    def setAvailableColors(self, quantity_vertices):
+        self.availableColors = [True] * quantity_vertices
     
     def eraseEdges(self) -> None:
         self.edges = dict()
@@ -364,6 +389,9 @@ class Graph:
     
     def insertToP(self, vertex) -> None:
         self.p.insert(0, vertex)
+    
+    def appendToUsedColors(self, color):
+        self.usedColors.append(color)
     
     def appendNewEdge(self, edge) -> None:
         source_label = edge.getSource()
@@ -606,6 +634,33 @@ class Algorithms():
             else:
                 break
         return None
+
+    # Hopcroft-Karp
+    def Hopcroft_Karp(self) -> None:
+        pass
+
+    def verticesColoring(self, graph: Graph) -> None:
+        vertices = sorted(list(graph.getVertices().keys()), key=lambda x: len(graph.getVertices()[x].getNeighbors()), reverse=True)
+
+        for vertexLabel in vertices:
+            graph.setAvailableColors(len(vertices))
+            vertex = graph.getVertices()[vertexLabel]
+            for neighbor in vertex.getNeighbors():
+                if neighbor in graph.getVertexColorMap():
+                    color = graph.getVertexColorMap()[neighbor]
+                    graph.getAvailableColors()[color] = False
+
+            for color, available in enumerate(graph.getAvailableColors()):
+                if available:
+                    graph.getVertexColorMap()[vertexLabel] = color
+                    if color not in graph.getUsedColors():
+                        graph.appendToUsedColors(color)
+                    break
+
+        print("Minimum quantity of colors: ",len(graph.getUsedColors()))
+        print("Vertex-Color map",graph.getVertexColorMap())
+
+        return graph.getVertexColorMap()
 
     # Achar os caminhos aumentantes
     # BFS for Edmonds-Karp
