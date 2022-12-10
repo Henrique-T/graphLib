@@ -3,7 +3,7 @@ import string
 from itertools import count
 import copy
 
-INPUT_FILE = "cor3.net"
+INPUT_FILE = "pequeno.net"
 
 class Vertex():
     """
@@ -26,8 +26,8 @@ class Vertex():
         self.visit_end_time = 2147483647        # End of visit counter
         self.k = 2147483647                     # Key value for later to be used in key structure
         self.beenSetInRG = False                # Has the vertex been set in the Residual Graph (RG)?
-        self.belongsToX = False
-        self.belongsToY = False
+        self.mate = None                        # vertex mate
+        self.isTheNullVertex = False            # is the vertex the Null vertex used in Hopcroft-Karp?
 
     def getDegree(self) -> int:
         return len(self.getNeighbors())
@@ -68,8 +68,14 @@ class Vertex():
     def getK(self) -> int:
         return self.k
     
+    def getMate(self) -> string:
+        return self.mate
+    
     def hasBeenSetInRG(self) -> bool:
         return self.beenSetInRG
+    
+    def getIsTheNullVertex(self) -> bool:
+        return self.isTheNullVertex
     
     def setLabel(self, label) -> None:
         self.label = label
@@ -118,6 +124,12 @@ class Vertex():
     
     def setAsSetInRG(self) -> None:
         self.beenSetInRG = True
+    
+    def setMate(self, mate) -> None:
+        self.mate = mate
+    
+    def setAsTheNullVertex(self) -> None:
+        self.isTheNullVertex = True
     
     def getAllInfos(self) -> dict:
         return {
@@ -342,6 +354,12 @@ class Graph:
     
     def getVertexColorMap(self) -> dict:
         return self.vertexColorMap
+    
+    def getTheNullVertex(self) -> string:
+        for vertexLabel in self.getVertices().keys():
+            if (self.getVertices()[vertexLabel].getIstheNullVertex() == True):
+                return vertexLabel
+        return ''
 
     def setRawEdges(self, raw_edges) -> None:
         self.raw_edges = raw_edges
@@ -636,8 +654,51 @@ class Algorithms():
         return None
 
     # Hopcroft-Karp
-    def Hopcroft_Karp(self) -> None:
-        pass
+    def Hopcroft_Karp(self, graph: Graph) -> None:
+        m = 0
+        while self.BFS_Hopcroft_Karp(graph) == True:
+            for vertexLabel in graph.getX():
+                vertex = graph.getVertices()[vertexLabel]
+                if vertex.getMate() == None:
+                    if self.DFS_Hopcroft_Karp(graph, vertex) == True:
+                        m = m + 1
+        print(m)
+
+    def BFS_Hopcroft_Karp(self, graph: Graph) -> bool:
+        q = queue.Queue()
+        for vertexLabel in graph.getX():
+            vertex = graph.getVertices()[vertexLabel]
+            if vertex.getMate() == None:
+                vertex.setDistance(0)
+                q.put(vertex)
+            else:
+                vertex.setDistance(2147483647)
+        nullVertex = Vertex("nullVertex")
+        nullVertex.setAsTheNullVertex()
+        while not q.empty():
+            x = q.get()
+            if x.getDistance() < nullVertex.getDistance():
+                for neighborLabel in x.getNeighbors():
+                    neighbor = graph.getVertices()[neighborLabel]
+                    mate = graph.getVertices()[neighbor.getMate()]
+                    if mate.getDistance() == 2147483647:
+                        mate.setDistance(x.getDistance()+1)
+                        q.put(mate)
+        return nullVertex.getDistance() != 2147483647
+    
+    def DFS_Hopcroft_Karp(self, graph: Graph, x) -> None:
+        if x != None:
+            for vertexLabel in x.getNeighbors():
+                neighbor = graph.getVertices()[vertexLabel]
+                mate = graph.getVertices()[neighbor.getMate()]
+                if mate.getDistance() == x.getDistance() + 1:
+                    if self.DFS_Hopcroft_Karp(graph, mate) == True:
+                        neighbor.setMate(x)
+                        x.setMate(neighbor)
+                        return True
+            x.setDistance(2147483647)
+            return False
+        return True
 
     def verticesColoring(self, graph: Graph) -> None:
         vertices = sorted(list(graph.getVertices().keys()), key=lambda x: len(graph.getVertices()[x].getNeighbors()), reverse=True)
