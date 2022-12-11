@@ -3,7 +3,7 @@ import string
 from itertools import count
 import copy
 
-INPUT_FILE = "pequeno.net"
+INPUT_FILE = "fluxo_maximo_aula.net"
 
 class Vertex():
     """
@@ -159,7 +159,7 @@ class Edge():
         self.source = vertex_A             # source vertex
         self.target = vertex_B             # target vertex
         self.weight = weight               # weight of the edge
-        self.residualWeight = 0.0          # residual weight of the edge
+        self.flow = 0                      # flow of the edge
 
     def getWeight(self) -> float:
         return self.weight
@@ -173,8 +173,8 @@ class Edge():
     def getTarget(self) -> string:
         return self.target
     
-    def getResidualWeight(self) -> float:
-        return self.residualWeight
+    def getFlow(self) -> int:
+        return self.flow
 
     def setLabel(self, label) -> None:
         self.label = label
@@ -188,15 +188,16 @@ class Edge():
     def setTarget(self,target) -> None:
         self.target = target
     
-    def setResidualWeight(self, residualWeight) -> None:
-        self.residualWeight = residualWeight
+    def setFlow(self, flow) -> None:
+        self.flow = flow
 
     def getAllInfos(self) -> dict:
         return {
             "label": self.getLabel(),
             "source": self.getSource(),
             "target": self.getTarget(),
-            "weight": self.getWeight()
+            "weight": self.getWeight(),
+            "flow": self.getFlow()
         }
 
 
@@ -629,27 +630,27 @@ class Algorithms():
     def Edmonds_Karp(self, graph: Graph, s, t) -> None:
         residual_graph = self.createResidualGraph(graph)
         residual_graph.setFlow(0)
+        #residual_graph.prettyPrint()
         while True:
-            residual_graph.prettyPrint()
             paths = self.findIncreasingPaths(residual_graph, s, t)
-            #print([(residual_graph.getEdges()[e].getLabel(),residual_graph.getEdges()[e].getWeight(),residual_graph.getEdges()[e].getResidualWeight()) for e in residual_graph.getEdges().keys()])
             if (paths):
                 paths2 = list()
                 paths2.append(paths[0].getLabel())
                 for i in range(1,len(paths)):
                     if (i < len(paths)):
                         paths2.append(paths[i-1].getLabel()+paths[i].getLabel())
-                print("paths2: ",[v for v in paths2])
                 pathsCapacity = self.getMinimalCapacity(residual_graph, paths2)         # get the smallest weight
-                print("path capacity: ", pathsCapacity)
+                print("paths capac: ", pathsCapacity)
                 for edge_label in paths2:
-                    if len(edge_label) > 1:
+                    if len(edge_label) > 1 and edge_label in graph.getEdges().keys():
                         edge = residual_graph.getEdges()[edge_label]
-                        return_edge = residual_graph.getEdges()[edge.getTarget()+edge.getSource()]
                         edge.setWeight(edge.getWeight()-pathsCapacity)
-                        return_edge.setWeight(return_edge.getWeight()+pathsCapacity) #check
+                        return_edge = residual_graph.getEdges()[edge.getTarget()+edge.getSource()]
+                        return_edge.setWeight(return_edge.getWeight()+pathsCapacity)
                 residual_graph.setFlow(residual_graph.getFlow()+pathsCapacity)
             else:
+                print("residual graph flow: ", residual_graph.getFlow())
+                #residual_graph.prettyPrint()
                 break
         return None
 
@@ -726,16 +727,23 @@ class Algorithms():
     # Achar os caminhos aumentantes
     # BFS for Edmonds-Karp
     def findIncreasingPaths(self, residual_graph: Graph, s_label, t_label) -> list or None:
+        residual_graph.p = []
+        for vLabel in residual_graph.getVertices().keys():
+            v = residual_graph.getVertices()[vLabel]
+            v.BeenVisited=False
+
         s = residual_graph.getVertices()[s_label]
         t = residual_graph.getVertices()[t_label]
         s.setAsVisited()
         q = queue.Queue()
         q.put(s) # enqueue
-        while not q.empty():
+
+        while q.empty() == False:
             u = q.get() # dequeue
             for neighbor_label in u.getOutgoingNeighbors():
                 neighbor = residual_graph.getVertices()[neighbor_label]
-                if (not neighbor.hasBeenVisited() and residual_graph.peso(u.getLabel(), neighbor.getLabel()) > 0):
+                edge = residual_graph.getEdges()[u.getLabel()+neighbor.getLabel()]
+                if (neighbor.hasBeenVisited() == False and edge.getWeight() > 0):
                     neighbor.setAsVisited()
                     neighbor.setAncestor(u)
                     if neighbor.getLabel() == t.getLabel():
@@ -744,11 +752,12 @@ class Algorithms():
                         while w.getLabel() != s.getLabel():
                             w = w.getAncestor()
                             residual_graph.insertToP(w)
+                        print("Path: ", [v.getLabel() for v in residual_graph.getP()])
                         return residual_graph.getP()
                     q.put(neighbor)
         return None
     
-    # util method to create residual graph
+    # util method to create residual graph Gf = (V, Af, Cf)
     def createResidualGraph(self, graph: Graph) -> Graph:
         residual_graph = copy.deepcopy(graph)
         for edge_label in graph.getEdges().keys():
@@ -757,23 +766,25 @@ class Algorithms():
             original_target = graph.getVertices()[edge.getTarget()]
             source = residual_graph.getVertices()[edge.getSource()]
             target = residual_graph.getVertices()[edge.getTarget()]
-            if (edge.getTarget() + edge.getSource()) not in (graph.getEdges().keys()):
+            if (edge.getTarget() + edge.getSource()) not in graph.getEdges().keys():
                 # build the return arc between target and source and reset the neighbors
                 return_edge = Edge(edge.getTarget(), edge.getSource(), 0)
-                residual_graph.appendNewEdge(return_edge) # add the return arc
-                if (not source.hasBeenSetInRG()):
-                    source.outgoingNeighbors = original_source.getOutgoingNeighbors() + original_source.getIncomingNeighbors()
+                residual_graph.appendNewEdge(return_edge)                                   # add the return edge to residual graph
+                if (source.hasBeenSetInRG() == False):
+                    source.outgoingNeighbors = original_source.getOutgoingNeighbors() \
+                        + original_source.getIncomingNeighbors()
                     source.incomingNeighbors = [] + source.getOutgoingNeighbors()
                     source.setAsSetInRG()
-                if (not target.hasBeenSetInRG()):
-                    target.outgoing = original_target.getOutgoingNeighbors() + original_target.getIncomingNeighbors()
+                if (not target.hasBeenSetInRG() == False):
+                    target.outgoing = original_target.getOutgoingNeighbors() \
+                        + original_target.getIncomingNeighbors()
                     target.incomingNeighbors = [] +  target.getOutgoingNeighbors()
                     target.setAsSetInRG()
             else:
                 # add an extra vertex: 
                 # target -> vertex_x -> source (with the original arc weight)
                 # source -> vertex_x -> target (with weight 0)
-                if ('x_' + edge.getTarget() + edge.getSource()) not in  (residual_graph.getVertices().keys()):
+                if ('x_' + edge.getTarget() + edge.getSource()) not in (residual_graph.getVertices().keys()):
                     vertex_x = Vertex('x_' + edge.getSource() + edge.getTarget())
                     new_edge_target_to_x = Edge(edge.getTarget(), vertex_x.getLabel(), edge.getWeight())
                     new_edge_x_to_source = Edge(vertex_x.getLabel(), edge.getSource(), edge.getWeight())
@@ -784,11 +795,11 @@ class Algorithms():
                     residual_graph.appendNewEdge(new_edge_x_to_source)
                     residual_graph.appendNewEdge(new_edge_source_to_x)
                     residual_graph.appendNewEdge(new_edge_x_to_target)
-                    if (not source.hasBeenSetInRG()):
+                    if (source.hasBeenSetInRG() == False):
                         source.outgoingNeighbors = [] + original_source.getIncomingNeighbors() + [vertex_x.getLabel()]
                         source.incomingNeighbors = [] + source.outgoingNeighbors
                         source.setAsSetInRG()
-                    if (not target.hasBeenSetInRG()):
+                    if (not target.hasBeenSetInRG() == False):
                         target.outgoingNeighbors = [] + original_target.getOutgoingNeighbors() + [vertex for vertex in original_target.getIncomingNeighbors() if vertex not in original_target.getOutgoingNeighbors()] + [vertex_x.getLabel()]
                         target.incomingNeighbors = [] + target.getOutgoingNeighbors()
                         target.setAsSetInRG()
