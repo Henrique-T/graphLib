@@ -3,7 +3,7 @@ import string
 from itertools import count
 import copy
 
-INPUT_FILE = "fluxo_maximo_aula.net"
+INPUT_FILE = "cor3.net"
 
 class Vertex():
     """
@@ -221,6 +221,8 @@ class Graph:
         self.flow = 2147483647                      # Flow
         self.p = list()                             # List of increasing paths - used for Edmonds-karp
         self.X = dict()                             # Indexed dict - used for coloring vertices
+        self.XVertices = list()                     # List of vertices for paring algorithm
+        self.YVertices = list()                     # List of vertices for paring algorithm
         self.availableColors = list()               
         self.usedColors = list()
         self.vertexColorMap = dict()
@@ -361,6 +363,12 @@ class Graph:
             if (self.getVertices()[vertexLabel].getIstheNullVertex() == True):
                 return vertexLabel
         return ''
+    
+    def getXVertices(self) -> list:
+        return self.XVertices
+    
+    def getYVertices(self) -> list:
+        return self.YVertices
 
     def setRawEdges(self, raw_edges) -> None:
         self.raw_edges = raw_edges
@@ -640,7 +648,6 @@ class Algorithms():
                     if (i < len(paths)):
                         paths2.append(paths[i-1].getLabel()+paths[i].getLabel())
                 pathsCapacity = self.getMinimalCapacity(residual_graph, paths2)         # get the smallest weight
-                print("paths capac: ", pathsCapacity)
                 for edge_label in paths2:
                     if len(edge_label) > 1 and edge_label in graph.getEdges().keys():
                         edge = residual_graph.getEdges()[edge_label]
@@ -657,8 +664,15 @@ class Algorithms():
     # Hopcroft-Karp
     def Hopcroft_Karp(self, graph: Graph) -> None:
         m = 0
-        while self.BFS_Hopcroft_Karp(graph) == True:
-            for vertexLabel in graph.getX():
+        # set X and Y
+        for i in range(len(graph.getVertices().keys())):
+            if (i <= (len(graph.getVertices().keys()))/2):
+                graph.getXVertices().append(list(graph.getVertices().keys())[i])
+            else:
+                graph.getYVertices().append(list(graph.getVertices().keys())[i])
+
+        while self.BFS_Hopcroft_Karp(graph) == True: #I might need to reset the lists like I did with the other algo.
+            for vertexLabel in graph.getXVertices():
                 vertex = graph.getVertices()[vertexLabel]
                 if vertex.getMate() == None:
                     if self.DFS_Hopcroft_Karp(graph, vertex) == True:
@@ -667,7 +681,7 @@ class Algorithms():
 
     def BFS_Hopcroft_Karp(self, graph: Graph) -> bool:
         q = queue.Queue()
-        for vertexLabel in graph.getX():
+        for vertexLabel in graph.getXVertices():
             vertex = graph.getVertices()[vertexLabel]
             if vertex.getMate() == None:
                 vertex.setDistance(0)
@@ -681,10 +695,11 @@ class Algorithms():
             if x.getDistance() < nullVertex.getDistance():
                 for neighborLabel in x.getNeighbors():
                     neighbor = graph.getVertices()[neighborLabel]
-                    mate = graph.getVertices()[neighbor.getMate()]
-                    if mate.getDistance() == 2147483647:
-                        mate.setDistance(x.getDistance()+1)
-                        q.put(mate)
+                    if (neighbor.getMate()):
+                        mate = graph.getVertices()[neighbor.getMate()]
+                        if mate.getDistance() == 2147483647:
+                            mate.setDistance(x.getDistance()+1)
+                            q.put(mate)
         return nullVertex.getDistance() != 2147483647
     
     def DFS_Hopcroft_Karp(self, graph: Graph, x) -> None:
@@ -752,7 +767,7 @@ class Algorithms():
                         while w.getLabel() != s.getLabel():
                             w = w.getAncestor()
                             residual_graph.insertToP(w)
-                        print("Path: ", [v.getLabel() for v in residual_graph.getP()])
+                        #print("Path: ", [v.getLabel() for v in residual_graph.getP()])
                         return residual_graph.getP()
                     q.put(neighbor)
         return None
